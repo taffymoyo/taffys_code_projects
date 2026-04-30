@@ -1,0 +1,10 @@
+[package]
+name = "Rust_Practice"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[[bin]]
+name = "Rust_Practice"
+path = "main.rs"
