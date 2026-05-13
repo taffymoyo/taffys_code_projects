@@ -7,4 +7,4 @@ edition = "2024"
 
 [[bin]]
 name = "Rust_Practice"
-path = "main.rs"
+path = "src/main.rs"

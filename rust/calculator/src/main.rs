@@ -52,7 +52,7 @@ fn main() {
 
         let mut arr = vec![];
         loop {
-            println!("1 - Include numbers, 2 - Calculate");
+            println!("\n1 - Include numbers, 2 - Calculate");
             print!("Type an answer: ");
             io::stdout().flush().unwrap();
             let mut answer = String::new();
@@ -70,7 +70,7 @@ fn main() {
                 println!("\nHere is the result of your calculation: {:?}", result);
                 break
             } else {
-                println!("Please select a valid option")
+                println!("Please select a valid option\n")
             }
         }
 
