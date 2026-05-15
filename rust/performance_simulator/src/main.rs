@@ -9,7 +9,7 @@ fn main() {
     println!("Welcome to the great show!");
     let char = characters::create();
 
-    println!("\nHere is your character!\nName: {}, \nAge: {}, \nGender: {:?}, \nRole: {:?}, \nTalent Level: {}\n", char.name, char.age, char.gender, char.role, char.talent);
+    println!("\nHere is your character!\n-----------------------\nName: {}, \nAge: {}, \nGender: {:?}, \nRole: {:?}, \nTalent Level: {}\n-----------------------", char.name, char.age, char.gender, char.role, char.talent);
 
     let mut count: i32 = 0;
 

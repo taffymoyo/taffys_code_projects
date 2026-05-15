@@ -18,7 +18,7 @@ impl Choice {
             Choice::Divide => math::divide(arr),
             Choice::Other => {
                 println!("Please pick a valid option!");
-                None  // still returns Option<i32>
+                None  
             }
         }   
     }
@@ -67,7 +67,7 @@ fn main() {
                 arr.push(num)   
             } else if answer.trim() == String::from("2") {
                 let result = choice.calculate(&arr);
-                println!("\nHere is the result of your calculation: {:?}", result);
+                println!("\nHere is the result of your calculation: {:?}\n", result);
                 break
             } else {
                 println!("Please select a valid option\n")
