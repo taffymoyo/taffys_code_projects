@@ -9,6 +9,7 @@ use reqwest;
 struct JikanAnime {
     mal_id: u32,
     title: String,
+    title_english: Option<String>,
     images: JikanImages,
     episodes: Option<u32>,
     synopsis: Option<String>,
@@ -56,15 +57,19 @@ struct UpdateWatchlist {
 
 #[get("/search")]
 async fn search_anime(query: web::Query<std::collections::HashMap<String, String>>) -> HttpResponse {
-    let q = match query.get("q") {
-        Some(q) => q,
-        None => return HttpResponse::BadRequest().body("Missing search query"),
-    };
+    let q = query.get("q").cloned().unwrap_or_default();
+    let genre = query.get("genre").cloned().unwrap_or_default();
+    let page = query.get("page").cloned().unwrap_or("1".to_string());
 
-    let url = format!("https://api.jikan.moe/v4/anime?q={}&limit=10", q);
-    
-    let response = reqwest::get(&url)
-        .await;
+   let mut url = format!(
+    "https://api.jikan.moe/v4/anime?q={}&limit=10&sfw=true&page={}&order_by=members&sort=desc",
+    q, page
+);
+    if !genre.is_empty() {
+        url.push_str(&format!("&genres={}", genre));
+    }
+
+    let response = reqwest::get(&url).await;
 
     match response {
         Ok(res) => {

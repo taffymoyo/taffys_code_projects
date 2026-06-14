@@ -420,7 +420,7 @@
 <body>
 
 <header>
-  <div class="logo">✦ animu</div>
+  <div class="logo">✦ Tanime</div>
   <nav>
     <button class="active" onclick="showView('search')">Search</button>
     <button onclick="showView('watchlist')">My List</button>
@@ -431,12 +431,24 @@
   <!-- Search view -->
   <div id="view-search" class="view active">
     <div class="search-hero">
-      <h1>Find your next obsession</h1>
+      <h1>The rabbit hole starts here...</h1>
       <p>Search any anime and add it to your personal watchlist</p>
+
       <div class="search-bar">
         <input id="search-input" type="text" placeholder="e.g. Attack on Titan..." />
+            <select class="status-select" id="genre-select" style="width:auto; padding: 0.75rem 1rem;">
+                <option value="">All Genres</option>
+                <option value="1">Action</option>
+                <option value="2">Adventure</option>
+                <option value="4">Comedy</option>
+                <option value="7">Mystery</option>
+                <option value="8">Drama</option>
+                <option value="10">Fantasy</option>
+                <option value="22">Romance</option>
+                <option value="36">Slice of Life</option>
+            </select>
         <button class="btn" onclick="searchAnime()">Search</button>
-      </div>
+    </div>
     </div>
     <div id="search-results"></div>
   </div>
@@ -481,21 +493,38 @@
     setTimeout(() => t.className = 'toast', 2500);
   }
 
-  // Search
-  async function searchAnime() {
+let currentPage = 1;
+let currentQuery = '';
+let currentGenre = '';
+
+async function searchAnime(page = 1) {
     const q = document.getElementById('search-input').value.trim();
-    if (!q) return;
+    const genre = document.getElementById('genre-select').value;
+    if (!q && !genre) return;
+
+    currentPage = page;
+    currentQuery = q;
+    currentGenre = genre;
+
     const container = document.getElementById('search-results');
     container.innerHTML = '<div class="loading">Searching...</div>';
 
     try {
-      const res = await fetch('/search?q=' + encodeURIComponent(q));
-      const data = await res.json();
-      renderSearchResults(data.data || []);
+        let url = '/search?q=' + encodeURIComponent(q) + '&page=' + page;
+        if (genre) url += '&genre=' + genre;
+        const res = await fetch(url);
+        const data = await res.json();
+        renderSearchResults(data.data || []);
     } catch {
-      container.innerHTML = '<div class="empty"><h2>Something went wrong</h2><p>Could not reach the server</p></div>';
+        container.innerHTML = '<div class="empty"><h2>Something went wrong</h2><p>Could not reach the server</p></div>';
     }
-  }
+}
+
+function changePage(dir) {
+    const newPage = currentPage + dir;
+    if (newPage < 1) return;
+    searchAnime(newPage);
+}
 
   function renderSearchResults(anime) {
     const container = document.getElementById('search-results');
@@ -508,7 +537,7 @@
       <div class="card">
         <img src="${a.images.jpg.image_url}" alt="${a.title}" loading="lazy" />
         <div class="card-body">
-          <div class="card-title">${a.title}</div>
+          <div class="card-title">${a.title_english ? a.title_english : a.title}</div>
           <div class="card-meta">${a.episodes ? a.episodes + ' eps' : 'Ongoing'}</div>
           <div class="card-actions">
             <select class="status-select" id="status-${a.mal_id}">
@@ -517,14 +546,19 @@
               <option>Completed</option>
               <option>Dropped</option>
             </select>
-            <button class="btn" onclick="addToWatchlist(${a.mal_id}, '${escapeTitle(a.title)}', '${a.images.jpg.image_url}', ${a.episodes || 0})">
+            <button class="btn" onclick="addToWatchlist(${a.mal_id}, '${escapeTitle(a.title_english || a.title)}', '${a.images.jpg.image_url}', ${a.episodes || 0})">
               + Add
             </button>
           </div>
         </div>
       </div>
-    `).join('') + '</div>';
-  }
+    `).join('') + '</div>' +
+    `<div style="display:flex; justify-content:center; gap:1rem; margin-top:1.5rem;">
+        <button class="btn btn-ghost" onclick="changePage(-1)" ${currentPage === 1 ? 'disabled' : ''}>← Prev</button>
+        <span style="display:flex; align-items:center; color:var(--muted); font-size:0.875rem;">Page ${currentPage}</span>
+        <button class="btn btn-ghost" onclick="changePage(1)">Next →</button>
+    </div>`;
+}
 
   function escapeTitle(title) {
     return title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
