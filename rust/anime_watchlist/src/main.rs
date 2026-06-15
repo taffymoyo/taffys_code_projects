@@ -38,6 +38,14 @@ struct WatchlistItem {
     image_url: Option<String>,
     status: String,
     episodes_watched: i64,
+    rating: Option<i64>,
+}
+
+#[derive(Deserialize)]
+struct UpdateWatchlist {
+    status: Option<String>,
+    episodes_watched: Option<i64>,
+    rating: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -47,12 +55,6 @@ struct AddToWatchlist {
     image_url: String,
     status: String,
     episodes_watched: i64,
-}
-
-#[derive(Deserialize)]
-struct UpdateWatchlist {
-    status: Option<String>,
-    episodes_watched: Option<i64>,
 }
 
 #[get("/search")]
@@ -86,7 +88,7 @@ async fn search_anime(query: web::Query<std::collections::HashMap<String, String
 async fn get_watchlist(pool: web::Data<SqlitePool>) -> HttpResponse {
     let items = sqlx::query_as!(
         WatchlistItem,
-        "SELECT id, mal_id, title, image_url, status, episodes_watched FROM watchlist"
+       "SELECT id, mal_id, title, image_url, status, episodes_watched, rating FROM watchlist"
     )
     .fetch_all(pool.get_ref())
     .await;
@@ -124,6 +126,12 @@ async fn update_watchlist(pool: web::Data<SqlitePool>, path: web::Path<i64>, bod
 
     if let Some(eps) = body.episodes_watched {
         sqlx::query!("UPDATE watchlist SET episodes_watched = ? WHERE id = ?", eps, id)
+            .execute(pool.get_ref())
+            .await.ok();
+    }
+
+    if let Some(rating) = body.rating {
+        sqlx::query!("UPDATE watchlist SET rating = ? WHERE id = ?", rating, id)
             .execute(pool.get_ref())
             .await.ok();
     }

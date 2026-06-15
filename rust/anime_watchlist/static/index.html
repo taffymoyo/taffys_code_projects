@@ -631,19 +631,25 @@ function changePage(dir) {
           <div class="watchlist-title">${a.title}</div>
           <span class="status-badge ${getBadgeClass(a.status)}">${a.status}</span>
         </div>
-        <div class="watchlist-controls">
-          <select class="status-select" style="width:140px" onchange="updateStatus(${a.id}, this.value)">
+       <div class="watchlist-controls">
+        <select class="status-select" style="width:140px" onchange="updateStatus(${a.id}, this.value)">
             ${['Plan to Watch','Watching','Completed','Dropped'].map(s =>
-              `<option ${a.status === s ? 'selected' : ''}>${s}</option>`
+            `<option ${a.status === s ? 'selected' : ''}>${s}</option>`
             ).join('')}
-          </select>
-          <div class="ep-counter">
+        </select>
+        <div class="ep-counter">
             <button onclick="updateEps(${a.id}, ${a.episodes_watched - 1})">−</button>
             <span>Ep ${a.episodes_watched}</span>
             <button onclick="updateEps(${a.id}, ${a.episodes_watched + 1})">+</button>
-          </div>
-          <button class="btn-danger" onclick="removeFromWatchlist(${a.id})">Remove</button>
         </div>
+  <select class="status-select" style="width:140px" onchange="updateRating(${a.id}, this.value)">
+    <option value="">Rate...</option>
+    ${[1,2,3,4,5,6,7,8,9,10].map(n =>
+      `<option value="${n}" ${a.rating === n ? 'selected' : ''}>⭐ ${n}/10</option>`
+    ).join('')}
+  </select>
+  <button class="btn-danger" onclick="removeFromWatchlist(${a.id})">Remove</button>
+</div>
       </div>
     `).join('') + '</div>';
   }
@@ -661,6 +667,19 @@ function changePage(dir) {
       showToast('Status updated');
     } catch { showToast('Failed to update', 'error'); }
   }
+
+  async function updateRating(id, rating) {
+    try {
+        await fetch('/watchlist/' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rating: parseInt(rating) })
+        });
+        const item = allWatchlistItems.find(a => a.id === id);
+        if (item) { item.rating = parseInt(rating); }
+        showToast('Rating updated ⭐');
+    } catch { showToast('Failed to update rating', 'error'); }
+}
 
   // Update episodes
   async function updateEps(id, eps) {
