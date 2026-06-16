@@ -1,6 +1,6 @@
 use actix_web::{get, web, App, HttpServer, HttpResponse};
 use actix_files::Files;
-use sqlx::SqlitePool;
+use sqlx::{Sqlite, SqlitePool};
 use serde::{Deserialize, Serialize};
 use dotenvy;
 use reqwest;
@@ -55,6 +55,40 @@ struct AddToWatchlist {
     image_url: String,
     status: String,
     episodes_watched: i64,
+}
+#[derive(Serialize)]
+struct Stats {
+    total: i64,
+    completed: i64,
+    watching: i64,
+    plan_to_watch: i64,
+    dropped: i64,
+    average_rating: Option<f64>,
+}
+
+#[get("/stats")]
+async fn get_stats(pool: web::Data<SqlitePool>) -> HttpResponse {
+    let row = sqlx::query!(
+        "SELECT 
+            COUNT(*) as total,
+            COUNT(CASE WHEN status = 'Completed' THEN 1 END) as completed,
+            COUNT(CASE WHEN status = 'Watching' THEN 1 END) as watching,
+            COUNT(CASE WHEN status = 'Plan to Watch' THEN 1 END) as plan_to_watch,
+            COUNT(CASE WHEN status = 'Dropped' THEN 1 END) as dropped,
+            AVG(rating) as average_rating
+        FROM watchlist"
+    ).fetch_one(pool.get_ref()).await.unwrap();
+
+    let stats = Stats {
+            total: row.total,
+            completed: row.completed,
+            watching: row.watching,
+            plan_to_watch: row.plan_to_watch,
+            dropped: row.dropped,
+            average_rating: row.average_rating,
+        };
+
+    HttpResponse::Ok().json(stats)
 }
 
 #[get("/search")]
@@ -169,6 +203,7 @@ async fn main() -> std::io::Result<()> {
     .service(add_watchlist)
     .service(update_watchlist)
     .service(delete_watchlist)
+    .service(get_stats)
     .service(Files::new("/", "./static").index_file("index.html"))
 
 })

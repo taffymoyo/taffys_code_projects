@@ -93,6 +93,7 @@
       font-weight: 800;
       letter-spacing: -0.03em;
       margin-bottom: 0.5rem;
+      padding-bottom: 0.25rem;
     }
 
     .search-hero p {
@@ -424,6 +425,7 @@
   <nav>
     <button class="active" onclick="showView('search')">Search</button>
     <button onclick="showView('watchlist')">My List</button>
+    <button onclick="showView('stats')">Stats</button>
   </nav>
 </header>
 
@@ -431,7 +433,7 @@
   <!-- Search view -->
   <div id="view-search" class="view active">
     <div class="search-hero">
-      <h1>The rabbit hole starts here...</h1>
+     <h1 id="hero-title"></h1>
       <p>Search any anime and add it to your personal watchlist</p>
 
       <div class="search-bar">
@@ -468,6 +470,12 @@
     </div>
     <div id="watchlist-items"></div>
   </div>
+  <div id="view-stats" class="view">
+    <div class="section-header">
+      <span class="section-title">My Stats</span>
+    </div>
+    <div id="stats-content"></div>
+  </div>
 </main>
 
 <div class="toast" id="toast"></div>
@@ -483,7 +491,8 @@
     document.getElementById('view-' + name).classList.add('active');
     event.target.classList.add('active');
     if (name === 'watchlist') loadWatchlist();
-  }
+    if (name === 'stats') loadStats(); // ← add this
+}
 
   // Toast notifications
   function showToast(msg, type = 'success') {
@@ -523,7 +532,15 @@ async function searchAnime(page = 1) {
 function changePage(dir) {
     const newPage = currentPage + dir;
     if (newPage < 1) return;
-    searchAnime(newPage);
+    currentPage = newPage;
+    
+    const container = document.getElementById('search-results');
+    container.innerHTML = '<div class="loading">Loading...</div>';
+    
+    fetch('/search?q=&page=' + currentPage + (currentGenre ? '&genre=' + currentGenre : ''))
+        .then(res => res.json())
+        .then(data => renderSearchResults(data.data || []))
+        .catch(() => container.innerHTML = '');
 }
 
   function renderSearchResults(anime) {
@@ -709,6 +726,72 @@ function changePage(dir) {
   document.getElementById('search-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') searchAnime();
   });
+
+  async function loadStats() {
+    try {
+        const res = await fetch('/stats');
+        const stats = await res.json();
+        document.getElementById('stats-content').innerHTML = `
+            <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:1rem; margin-top:1.5rem;">
+                <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
+                    <div style="color:var(--muted); font-size:0.8rem; margin-bottom:0.5rem;">TOTAL ANIME</div>
+                    <div style="font-size:2rem; font-weight:700; font-family:'Syne',sans-serif;">${stats.total}</div>
+                </div>
+                <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
+                    <div style="color:var(--muted); font-size:0.8rem; margin-bottom:0.5rem;">COMPLETED</div>
+                    <div style="font-size:2rem; font-weight:700; font-family:'Syne',sans-serif; color:var(--success);">${stats.completed}</div>
+                </div>
+                <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
+                    <div style="color:var(--muted); font-size:0.8rem; margin-bottom:0.5rem;">WATCHING</div>
+                    <div style="font-size:2rem; font-weight:700; font-family:'Syne',sans-serif; color:var(--accent2);">${stats.watching}</div>
+                </div>
+                <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
+                    <div style="color:var(--muted); font-size:0.8rem; margin-bottom:0.5rem;">PLAN TO WATCH</div>
+                    <div style="font-size:2rem; font-weight:700; font-family:'Syne',sans-serif; color:var(--accent);">${stats.plan_to_watch}</div>
+                </div>
+                <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
+                    <div style="color:var(--muted); font-size:0.8rem; margin-bottom:0.5rem;">DROPPED</div>
+                    <div style="font-size:2rem; font-weight:700; font-family:'Syne',sans-serif; color:var(--danger);">${stats.dropped}</div>
+                </div>
+                <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
+                    <div style="color:var(--muted); font-size:0.8rem; margin-bottom:0.5rem;">AVERAGE RATING</div>
+                    <div style="font-size:2rem; font-weight:700; font-family:'Syne',sans-serif;">⭐ ${stats.average_rating ? stats.average_rating.toFixed(1) : 'N/A'}</div>
+                </div>
+            </div>
+        `;
+    } catch {
+        document.getElementById('stats-content').innerHTML = '<div class="empty"><h2>Could not load stats</h2></div>';
+    }
+}
+
+const titles = [
+    "The rabbit hole starts here...",
+    "What are you watching next?",
+    "It's time for a binge!"
+];
+
+document.getElementById('hero-title').textContent = titles[Math.floor(Math.random() * titles.length)];
+
+async function loadPopularAnime() {
+    document.getElementById('search-input').value = '';
+    currentQuery = '';
+    currentGenre = '';
+    currentPage = 1;
+    
+    const container = document.getElementById('search-results');
+    container.innerHTML = '<div class="loading">Loading...</div>';
+    try {
+        const res = await fetch('/search?q=&page=1');
+        const data = await res.json();
+        renderSearchResults(data.data || []);
+    } catch {
+        container.innerHTML = '';
+    }
+}
+
+loadPopularAnime();
+
 </script>
 </body>
 </html>
+
