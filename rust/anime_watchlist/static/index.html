@@ -491,7 +491,7 @@
     document.getElementById('view-' + name).classList.add('active');
     event.target.classList.add('active');
     if (name === 'watchlist') loadWatchlist();
-    if (name === 'stats') loadStats(); // ← add this
+    if (name === 'stats') loadStats();
 }
 
   // Toast notifications
@@ -665,6 +665,7 @@ function changePage(dir) {
       `<option value="${n}" ${a.rating === n ? 'selected' : ''}>⭐ ${n}/10</option>`
     ).join('')}
   </select>
+  <button class="btn-ghost" style="font-size:0.75rem; padding:0.4rem 0.6rem;" onclick="showRecommendations(${a.mal_id}, '${escapeTitle(a.title)}')">Similar ✦</button>
   <button class="btn-danger" onclick="removeFromWatchlist(${a.id})">Remove</button>
 </div>
       </div>
@@ -789,9 +790,50 @@ async function loadPopularAnime() {
     }
 }
 
+async function showRecommendations(mal_id, title) {
+  document.getElementById('rec-modal').style.display = 'flex';
+  document.getElementById('rec-title').textContent = 'Similar to ' + title;
+  const content = document.getElementById('rec-content');
+  content.innerHTML = '<div class="loading">Finding similar anime...</div>';
+
+  try {
+    const res = await fetch('/recommendations/' + mal_id);
+    const anime = await res.json();
+    if (!anime.length) {
+      content.innerHTML = '<div class="empty"><h2>No recommendations found</h2></div>';
+      return;
+    }
+    content.innerHTML = '<div class="grid">' + anime.map(a => `
+      <div class="card">
+        <img src="${a.images.jpg.image_url}" alt="${a.title}" loading="lazy" />
+        <div class="card-body">
+          <div class="card-title">${a.title_english ? a.title_english : a.title}</div>
+          <button class="btn" onclick="addToWatchlist(${a.mal_id}, '${escapeTitle(a.title_english || a.title)}', '${a.images.jpg.image_url}', ${a.episodes || 0}); closeRecommendations();">+ Add</button>
+        </div>
+      </div>
+    `).join('') + '</div>';
+  } catch {
+    content.innerHTML = '<div class="empty"><h2>Could not load recommendations</h2></div>';
+  }
+}
+
+function closeRecommendations() {
+  document.getElementById('rec-modal').style.display = 'none';
+}
+
 loadPopularAnime();
 
 </script>
+<div id="rec-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center;">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:1.5rem; max-width:700px; width:90%; max-height:80vh; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <span id="rec-title" style="font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem;"></span>
+      <button class="btn-ghost" style="padding:0.4rem 0.8rem;" onclick="closeRecommendations()">✕</button>
+    </div>
+    <div id="rec-content"></div>
+  </div>
+</div>
+
 </body>
 </html>
 

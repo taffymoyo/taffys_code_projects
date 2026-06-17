@@ -66,6 +66,16 @@ struct Stats {
     average_rating: Option<f64>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct RecommendationEntry {
+    entry: JikanAnime,
+}
+
+#[derive(Serialize, Deserialize)]
+struct RecommendationsResponse {
+    data: Vec<RecommendationEntry>,
+}
+
 #[get("/stats")]
 async fn get_stats(pool: web::Data<SqlitePool>) -> HttpResponse {
     let row = sqlx::query!(
@@ -89,6 +99,27 @@ async fn get_stats(pool: web::Data<SqlitePool>) -> HttpResponse {
         };
 
     HttpResponse::Ok().json(stats)
+}
+
+#[get("/recommendations/{mal_id}")]
+async fn get_recommendations(path: web::Path<i64>) -> HttpResponse {
+    let mal_id = path.into_inner();
+    let url = format!("https://api.jikan.moe/v4/anime/{}/recommendations", mal_id);
+
+    let response = reqwest::get(&url).await;
+
+    match response {
+        Ok(res) => {
+            match res.json::<RecommendationsResponse>().await {
+                Ok(data) => {
+                    let anime: Vec<JikanAnime> = data.data.into_iter().take(6).map(|r| r.entry).collect();
+                    HttpResponse::Ok().json(anime)
+                }
+                Err(_) => HttpResponse::InternalServerError().body("Failed to parse recommendations"),
+            }
+        }
+        Err(_) => HttpResponse::InternalServerError().body("Failed to reach Jikan API"),
+    }
 }
 
 #[get("/search")]
@@ -204,6 +235,7 @@ async fn main() -> std::io::Result<()> {
     .service(update_watchlist)
     .service(delete_watchlist)
     .service(get_stats)
+    .service(get_recommendations)
     .service(Files::new("/", "./static").index_file("index.html"))
 
 })
