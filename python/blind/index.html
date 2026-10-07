@@ -10,7 +10,8 @@
 
   <button id="start">Start camera</button>
 
-  <p id="status" aria-live="polite">Camera is off.</p>
+  <p id="status">Camera is off.</p>
+  <p id="guidance" aria-live="polite"></p>
   <p id="numbers">No face data yet.</p>
 
   <video id="video" autoplay playsinline muted
@@ -22,10 +23,55 @@
 
     const startButton = document.getElementById("start");
     const status = document.getElementById("status");
+    const guidance = document.getElementById("guidance");
     const numbers = document.getElementById("numbers");
     const video = document.getElementById("video");
 
     let detector = null;
+
+    // Edit these numbers to tune how strict it is
+    const LEFT_LIMIT = 40;    // face centre under this = too far right (your side)
+    const RIGHT_LIMIT = 60;   // face centre over this = too far left (your side)
+    const HIGH_LIMIT = 25;    // face centre under this = too high in frame
+    const LOW_LIMIT = 55;     // face centre over this = too low in frame
+    const FAR_LIMIT = 15;     // face width under this = too far away
+    const CLOSE_LIMIT = 40;   // face width over this = too close
+
+    // Turns the numbers into one sentence.
+    // The camera image is not mirrored: if the face appears on the LEFT of
+    // the image, the person is on THEIR right, so we tell them to move left.
+    function getMessage(x, y, size) {
+      const problems = [];
+      if (x < LEFT_LIMIT) problems.push("move left");
+      else if (x > RIGHT_LIMIT) problems.push("move right");
+      if (y < HIGH_LIMIT) problems.push("you are too high in the frame");
+      else if (y > LOW_LIMIT) problems.push("you are too low in the frame");
+      if (size < FAR_LIMIT) problems.push("move closer");
+      else if (size > CLOSE_LIMIT) problems.push("move back");
+
+      if (problems.length === 0) return "You are centred.";
+      return problems.join(", ");
+    }
+
+    // Only announce a message once it has stayed the same for a moment,
+    // and never repeat the one that was just announced.
+    let announced = "";
+    let candidate = "";
+    let candidateSince = 0;
+    const HOLD_MS = 800;
+
+    function maybeAnnounce(message) {
+      const now = performance.now();
+      if (message !== candidate) {
+        candidate = message;
+        candidateSince = now;
+        return;
+      }
+      if (message !== announced && now - candidateSince > HOLD_MS) {
+        speechSynthesis.speak(new SpeechSynthesisUtterance(message));
+        announced = message;
+      }
+    }
 
     async function loadDetector() {
       const vision = await FilesetResolver.forVisionTasks(
@@ -45,14 +91,16 @@
         const result = detector.detectForVideo(video, performance.now());
         if (result.detections.length === 0) {
           numbers.textContent = "No face found.";
+          maybeAnnounce("I can't see a face.");
         } else {
           const box = result.detections[0].boundingBox;
-          const centreX = ((box.originX + box.width / 2) / video.videoWidth) * 100;
-          const centreY = ((box.originY + box.height / 2) / video.videoHeight) * 100;
+          const x = ((box.originX + box.width / 2) / video.videoWidth) * 100;
+          const y = ((box.originY + box.height / 2) / video.videoHeight) * 100;
           const size = (box.width / video.videoWidth) * 100;
           numbers.textContent =
-            `Face centre: ${centreX.toFixed(0)}% from left, ` +
-            `${centreY.toFixed(0)}% from top. Face width: ${size.toFixed(0)}% of frame.`;
+            `Face centre: ${x.toFixed(0)}% from left, ` +
+            `${y.toFixed(0)}% from top. Face width: ${size.toFixed(0)}% of frame.`;
+          maybeAnnounce(getMessage(x, y, size));
         }
       }
       requestAnimationFrame(loop);
