@@ -11,23 +11,64 @@
   <button id="start">Start camera</button>
 
   <p id="status" aria-live="polite">Camera is off.</p>
+  <p id="numbers">No face data yet.</p>
 
   <video id="video" autoplay playsinline muted
          style="max-width:100%; display:none"></video>
 
-  <script>
+  <script type="module">
+    import { FaceDetector, FilesetResolver } from
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
+
     const startButton = document.getElementById("start");
     const status = document.getElementById("status");
+    const numbers = document.getElementById("numbers");
     const video = document.getElementById("video");
+
+    let detector = null;
+
+    async function loadDetector() {
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+      );
+      detector = await FaceDetector.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
+        },
+        runningMode: "VIDEO"
+      });
+    }
+
+    function loop() {
+      if (detector && video.videoWidth > 0) {
+        const result = detector.detectForVideo(video, performance.now());
+        if (result.detections.length === 0) {
+          numbers.textContent = "No face found.";
+        } else {
+          const box = result.detections[0].boundingBox;
+          const centreX = ((box.originX + box.width / 2) / video.videoWidth) * 100;
+          const centreY = ((box.originY + box.height / 2) / video.videoHeight) * 100;
+          const size = (box.width / video.videoWidth) * 100;
+          numbers.textContent =
+            `Face centre: ${centreX.toFixed(0)}% from left, ` +
+            `${centreY.toFixed(0)}% from top. Face width: ${size.toFixed(0)}% of frame.`;
+        }
+      }
+      requestAnimationFrame(loop);
+    }
 
     startButton.addEventListener("click", async () => {
       try {
+        status.textContent = "Loading face detector...";
+        await loadDetector();
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
         video.style.display = "block";
         status.textContent = "Camera is on.";
+        loop();
       } catch (err) {
-        status.textContent = "Could not open the camera: " + err.message;
+        status.textContent = "Something went wrong: " + err.message;
       }
     });
   </script>
