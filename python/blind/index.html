@@ -1,124 +1,238 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Video Call Framing Helper</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Framing Helper: check your camera before a call</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef2f6; --surface: #ffffff; --ink: #10243a; --muted: #4a5d70;
+    --line: #c5d0db; --accent: #0b6e99; --accent-ink: #ffffff;
+    --good: #1f7a4d; --warn: #9a4a06; --stage: #0c1722;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1a26; --surface: #162636; --ink: #e8eef4; --muted: #a3b4c4;
+      --line: #2c4157; --accent: #5bc0eb; --accent-ink: #0e1a26;
+      --good: #6fd29b; --warn: #f2a65a; --stage: #060d14;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1a26; --surface: #162636; --ink: #e8eef4; --muted: #a3b4c4;
+    --line: #2c4157; --accent: #5bc0eb; --accent-ink: #0e1a26;
+    --good: #6fd29b; --warn: #f2a65a; --stage: #060d14;
+  }
+  :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 1.125rem; line-height: 1.55;
+  }
+  main { max-width: 40rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+  h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 .5rem; letter-spacing: -.01em; }
+  .lede { color: var(--muted); margin: 0 0 1.5rem; max-width: 34rem; }
+  .h2 { font-size: 1.25rem; margin: 1.5rem 0 .4rem; }
+  .note .h2 { margin-top: 0; }
+  #howto { margin-bottom: 1rem; }
+
+  .stage {
+    position: relative; background: var(--stage); border-radius: 1rem; overflow: hidden;
+    aspect-ratio: 4 / 3; border: 2px solid var(--line);
+  }
+  .stage video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: none; }
+  .stage.on video { display: block; }
+  .stage .idle { position: absolute; inset: 0; display: grid; place-items: center; color: #9fb3c6; padding: 1rem; text-align: center; }
+  .stage.on .idle { display: none; }
+  .zone { position: absolute; left: 40%; top: 25%; width: 20%; height: 30%;
+    border: 3px dashed rgba(255,255,255,.85); border-radius: .75rem; display: none; }
+  .stage.on .zone { display: block; }
+  .dot { position: absolute; width: 1.25rem; height: 1.25rem; margin: -.625rem 0 0 -.625rem;
+    border-radius: 50%; background: var(--warn); border: 3px solid #fff; display: none;
+    transition: left .15s linear, top .15s linear, background-color .2s; }
+  .dot.ok { background: var(--good); }
+  .stage.on .dot { display: block; }
+
+  .guidance {
+    margin: 1rem 0; padding: 1.25rem 1.25rem; background: var(--surface);
+    border: 2px solid var(--line); border-left: .5rem solid var(--muted); border-radius: .75rem;
+    font-size: 1.6rem; line-height: 1.25; font-weight: 700; min-height: 5.5rem;
+  }
+  .guidance.ok { border-left-color: var(--good); }
+  .guidance.fix { border-left-color: var(--warn); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; align-items: center; }
+  button {
+    font: inherit; font-weight: 700; min-height: 3.25rem; padding: .6rem 1.6rem; border-radius: .75rem;
+    border: 2px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  }
+  button[aria-pressed="true"] { background: transparent; color: var(--accent); }
+  label.opt { display: flex; gap: .6rem; align-items: center; cursor: pointer; }
+  input[type=checkbox] { width: 1.5rem; height: 1.5rem; accent-color: var(--accent); }
+  :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+  .status { color: var(--muted); margin: 1rem 0 0; }
+  details { margin-top: 1.5rem; color: var(--muted); }
+  summary { cursor: pointer; font-weight: 700; color: var(--ink); }
+  .note { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 1rem; max-width: 34rem; }
+  @media (prefers-reduced-motion: reduce) { .dot { transition: none; } }
+</style>
 </head>
 <body>
-  <h1>Video Call Framing Helper</h1>
+<main>
+  <h1>Framing Helper</h1>
+  <p class="lede">Check how you look on camera before you join a call. It tells you, out loud and in text, when to move, how close to sit, and whether you are centred.</p>
 
-  <button id="start">Start camera</button>
+  <div class="stage" id="stage">
+    <p class="idle">The camera preview appears here once you start.</p>
+    <video id="video" autoplay playsinline muted aria-hidden="true"></video>
+    <div class="zone" aria-hidden="true"></div>
+    <div class="dot" id="dot" aria-hidden="true"></div>
+  </div>
 
-  <p id="status">Camera is off.</p>
-  <p id="guidance" aria-live="polite"></p>
-  <p id="numbers">No face data yet.</p>
+  <p class="guidance" id="guidance" aria-live="polite">Press Start camera to begin.</p>
 
-  <video id="video" autoplay playsinline muted
-         style="max-width:100%; display:none"></video>
+  <h2 class="h2">Before you start</h2>
+  <p class="lede" id="howto">If you use a screen reader such as VoiceOver, untick "Speak aloud" so you hear one voice instead of two. Otherwise leave it ticked. Directions are from your point of view: "move left" means your left.</p>
 
-  <script type="module">
-    import { FaceDetector, FilesetResolver } from
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
+  <div class="controls">
+    <button id="start" type="button">Start camera</button>
+    <label class="opt"><input type="checkbox" id="speak" checked aria-describedby="howto"> Speak aloud</label>
+  </div>
+  <p class="status" id="status">Camera is off.</p>
 
-    const startButton = document.getElementById("start");
-    const status = document.getElementById("status");
-    const guidance = document.getElementById("guidance");
-    const numbers = document.getElementById("numbers");
-    const video = document.getElementById("video");
+  <details>
+    <summary>Technical readout</summary>
+    <p id="numbers">No face data yet.</p>
+  </details>
 
-    let detector = null;
+  <section class="note" aria-labelledby="privacy-h">
+    <h2 class="h2" id="privacy-h">Privacy</h2>
+    <p>Your video stays on your device. Nothing is recorded or uploaded; the face detector runs inside this page.</p>
+  </section>
+</main>
 
-    // Edit these numbers to tune how strict it is
-    const LEFT_LIMIT = 40;    // face centre under this = too far right (your side)
-    const RIGHT_LIMIT = 60;   // face centre over this = too far left (your side)
-    const HIGH_LIMIT = 25;    // face centre under this = too high in frame
-    const LOW_LIMIT = 55;     // face centre over this = too low in frame
-    const FAR_LIMIT = 15;     // face width under this = too far away
-    const CLOSE_LIMIT = 40;   // face width over this = too close
+<script type="module">
+  import { FaceDetector, FilesetResolver } from
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
 
-    // Turns the numbers into one sentence.
-    // The camera image is not mirrored: if the face appears on the LEFT of
-    // the image, the person is on THEIR right, so we tell them to move left.
-    function getMessage(x, y, size) {
-      const problems = [];
-      if (x < LEFT_LIMIT) problems.push("move left");
-      else if (x > RIGHT_LIMIT) problems.push("move right");
-      if (y < HIGH_LIMIT) problems.push("you are too high in the frame");
-      else if (y > LOW_LIMIT) problems.push("you are too low in the frame");
-      if (size < FAR_LIMIT) problems.push("move closer");
-      else if (size > CLOSE_LIMIT) problems.push("move back");
+  const $ = (id) => document.getElementById(id);
+  const startButton = $("start"), status = $("status"), guidance = $("guidance"),
+        numbers = $("numbers"), video = $("video"), stage = $("stage"),
+        dot = $("dot"), speak = $("speak");
 
-      if (problems.length === 0) return "You are centred.";
-      return problems.join(", ");
-    }
+  let detector = null, stream = null, running = false;
 
-    // Only announce a message once it has stayed the same for a moment,
-    // and never repeat the one that was just announced.
-    let announced = "";
-    let candidate = "";
-    let candidateSince = 0;
-    const HOLD_MS = 800;
+  // Tune how strict it is
+  const LEFT_LIMIT = 40, RIGHT_LIMIT = 60;   // face centre, % from left of image
+  const HIGH_LIMIT = 25, LOW_LIMIT = 55;     // face centre, % from top
+  const FAR_LIMIT = 15, CLOSE_LIMIT = 40;    // face width, % of frame
 
-    function maybeAnnounce(message) {
-      const now = performance.now();
-      if (message !== candidate) {
-        candidate = message;
-        candidateSince = now;
-        return;
+  // Image is not mirrored: face on the LEFT of the image = person's RIGHT, so "move left".
+  function getMessage(x, y, size) {
+    const p = [];
+    if (x < LEFT_LIMIT) p.push("move left");
+    else if (x > RIGHT_LIMIT) p.push("move right");
+    if (y < HIGH_LIMIT) p.push("you are too high in the frame");
+    else if (y > LOW_LIMIT) p.push("you are too low in the frame");
+    if (size < FAR_LIMIT) p.push("move closer");
+    else if (size > CLOSE_LIMIT) p.push("move back");
+    return p.length ? p.join(", ") : "You are centred.";
+  }
+
+  // Announce only when a message has held steady, and never repeat it.
+  let announced = "", candidate = "", candidateSince = 0;
+  const HOLD_MS = 800;
+
+  function maybeAnnounce(message) {
+    const now = performance.now();
+    if (message !== candidate) { candidate = message; candidateSince = now; return; }
+    if (message !== announced && now - candidateSince > HOLD_MS) {
+      const text = message.charAt(0).toUpperCase() + message.slice(1);
+      guidance.textContent = text;
+      guidance.className = "guidance " + (message === "You are centred." ? "ok" : "fix");
+      announced = message;
+      if (speak.checked) {
+        speechSynthesis.cancel();
+        speechSynthesis.speak(new SpeechSynthesisUtterance(text));
       }
-      if (message !== announced && now - candidateSince > HOLD_MS) {
-        speechSynthesis.speak(new SpeechSynthesisUtterance(message));
-        announced = message;
-      }
     }
+  }
 
-    async function loadDetector() {
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-      );
-      detector = await FaceDetector.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath:
-            "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
-        },
-        runningMode: "VIDEO"
-      });
-    }
-
-    function loop() {
-      if (detector && video.videoWidth > 0) {
-        const result = detector.detectForVideo(video, performance.now());
-        if (result.detections.length === 0) {
-          numbers.textContent = "No face found.";
-          maybeAnnounce("I can't see a face.");
-        } else {
-          const box = result.detections[0].boundingBox;
-          const x = ((box.originX + box.width / 2) / video.videoWidth) * 100;
-          const y = ((box.originY + box.height / 2) / video.videoHeight) * 100;
-          const size = (box.width / video.videoWidth) * 100;
-          numbers.textContent =
-            `Face centre: ${x.toFixed(0)}% from left, ` +
-            `${y.toFixed(0)}% from top. Face width: ${size.toFixed(0)}% of frame.`;
-          maybeAnnounce(getMessage(x, y, size));
-        }
-      }
-      requestAnimationFrame(loop);
-    }
-
-    startButton.addEventListener("click", async () => {
-      try {
-        status.textContent = "Loading face detector...";
-        await loadDetector();
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-        video.style.display = "block";
-        status.textContent = "Camera is on.";
-        loop();
-      } catch (err) {
-        status.textContent = "Something went wrong: " + err.message;
-      }
+  async function loadDetector() {
+    if (detector) return;
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+    detector = await FaceDetector.createFromOptions(vision, {
+      baseOptions: { modelAssetPath:
+        "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite" },
+      runningMode: "VIDEO"
     });
-  </script>
+  }
+
+  function loop() {
+    if (!running) return;
+    if (detector && video.videoWidth > 0) {
+      const result = detector.detectForVideo(video, performance.now());
+      if (result.detections.length === 0) {
+        numbers.textContent = "No face found.";
+        dot.style.display = "none";
+        maybeAnnounce("I can't see a face.");
+      } else {
+        const b = result.detections[0].boundingBox;
+        const x = ((b.originX + b.width / 2) / video.videoWidth) * 100;
+        const y = ((b.originY + b.height / 2) / video.videoHeight) * 100;
+        const size = (b.width / video.videoWidth) * 100;
+        numbers.textContent = `Face centre: ${x.toFixed(0)}% from left, ${y.toFixed(0)}% from top. Face width: ${size.toFixed(0)}% of frame.`;
+        // The preview is mirrored, so flip the dot to match what the person sees.
+        dot.style.display = "";
+        dot.style.left = (100 - x) + "%";
+        dot.style.top = y + "%";
+        const msg = getMessage(x, y, size);
+        dot.classList.toggle("ok", msg === "You are centred.");
+        maybeAnnounce(msg);
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+
+  function stop() {
+    running = false;
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    stream = null; video.srcObject = null;
+    stage.classList.remove("on");
+    speechSynthesis.cancel();
+    announced = candidate = "";
+    startButton.textContent = "Start camera";
+    startButton.setAttribute("aria-pressed", "false");
+    guidance.className = "guidance";
+    guidance.textContent = "Camera stopped.";
+    status.textContent = "Camera is off.";
+  }
+
+  startButton.addEventListener("click", async () => {
+    if (running) { stop(); return; }
+    try {
+      status.textContent = "Loading face detector...";
+      await loadDetector();
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      stage.classList.add("on");
+      running = true;
+      startButton.textContent = "Stop camera";
+      startButton.setAttribute("aria-pressed", "true");
+      status.textContent = "Camera is on. Nothing leaves your device.";
+      guidance.textContent = "Looking for your face...";
+      loop();
+    } catch (err) {
+      status.textContent = "Could not start: " + err.message +
+        ". Check that camera access is allowed for this site.";
+    }
+  });
+</script>
 </body>
 </html>
