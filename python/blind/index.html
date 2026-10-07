@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Call Framing Helper</title>
+</head>
+<body>
+  <h1>Video Call Framing Helper</h1>
+
+  <button id="start">Start camera</button>
+
+  <p id="status" aria-live="polite">Camera is off.</p>
+
+  <video id="video" autoplay playsinline muted
+         style="max-width:100%; display:none"></video>
+
+  <script>
+    const startButton = document.getElementById("start");
+    const status = document.getElementById("status");
+    const video = document.getElementById("video");
+
+    startButton.addEventListener("click", async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        video.style.display = "block";
+        status.textContent = "Camera is on.";
+      } catch (err) {
+        status.textContent = "Could not open the camera: " + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
